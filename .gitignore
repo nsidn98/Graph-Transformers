@@ -6,6 +6,7 @@ __pycache__/
 # Custom files
 .vscode/
 .DS_Store
+wandb*
 
 # C extensions
 *.so
