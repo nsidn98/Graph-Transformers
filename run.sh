@@ -15,4 +15,4 @@ mkdir -p out_files
 # Run the script
 # script to iterate through different hyperparameters
 datasets=('TU_ENZYMES' 'TU_MUTAG' 'TU_AIDS' 'TU_PROTEINS' 'TU_IMDB')
-python -m train_scripts.runNaiveTransformer.py --dataset_name=${datasets[$SLURM_ARRAY_TASK_ID]}  --exp_name=${datasets[$SLURM_ARRAY_TASK_ID]} --batch_size=128 &> out_files/out_${nodes[$SLURM_ARRAY_TASK_ID]}_${Ks[$SLURM_ARRAY_TASK_ID]}_CIFAR
+python -m train_scripts.runNaiveTransformer.py --dataset_name=${datasets[$SLURM_ARRAY_TASK_ID]}  --exp_name=${datasets[$SLURM_ARRAY_TASK_ID]} --batch_size=128 &> out_files/out_${datasets[$SLURM_ARRAY_TASK_ID]}
