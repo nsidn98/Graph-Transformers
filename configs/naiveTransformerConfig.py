@@ -8,8 +8,7 @@ parser.add_argument('-e', '--epoch', type=int, default=10000, help='Number of ep
 ##################################################################
 
 ##################### data #####################
-parser.add_argument('--dataset_name', type=str, default='MUTAG', 
-                    choices=['ENZYMES', 'PROTEINS', 'MUTAG', 'AIDS'],
+parser.add_argument('--dataset_name', type=str, default='TU_MUTAG',
                     help='Dataset to use')
 parser.add_argument('--train_test_val_split', type=float, nargs='+', default=[0.7,0.2,0.1],
                     help='Splitting of data into train-test-val')
@@ -23,9 +22,17 @@ parser.add_argument('--use_node_attr', type=lambda x:bool(strtobool(x)), default
                     help='To load extra node feats from dataset')
 parser.add_argument('--classification_task', type=lambda x:bool(strtobool(x)), default=True,
                     help='Whether the dataset is a classification task or regression')
+parser.add_argument('--task', type=str, default='graph', choices=['graph', 'edge', 'link_pred', 'node'],
+                    help='The task for which the dataset is used for')
 ##################################################################
 
 ##################### network architecture #####################
+parser.add_argument('--hidden_dim', type=int, default=32, 
+                    help='Hidden layer dimensions for transformerConv and Linear layers')
+parser.add_argument('--num_layers', type=int, default=5,
+                    help='Number of transformerConv layers')
+parser.add_argument('--global_aggr', type=str, default='add', choices=['add', 'mean'],
+                    help='Global aggregation after conv layers')
 parser.add_argument('--heads', type=int, default=1, help='Number of heads for attention layers')
 parser.add_argument('--concat_heads', type=lambda x:bool(strtobool(x)), default=True,
                     help='Whether to concatenate heads or average over')
@@ -43,6 +50,7 @@ parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay 
 
 ##################### book keeping #####################
 parser.add_argument('--project', type=str, default='naive-gcn', help='wandb project space')
+parser.add_argument('--exp_name', type=str, help='Name for experiment')
 parser.add_argument('--save_freq', type=int, default=100, 
                     help='Frequency of train steps to save the weights of the network')
 parser.add_argument('--seed', type=int, default=0, help='Seed for all randomness')
@@ -56,7 +64,7 @@ def config_check(args:argparse.Namespace):
     """
     # if dryrun the don't run for default number epochs
     if args.dryrun:
-        args.epoch = 2
+        args.epoch = 5
 
     return args
 

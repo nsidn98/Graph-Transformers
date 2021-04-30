@@ -13,7 +13,8 @@ sys.path.append(os.path.abspath(os.getcwd()))
 from utils.utils import connected_to_internet
 
 class WandbLogger:
-    def __init__(self, experiment_name:str, save_folder:str, project:str, entity:str, args:argparse.Namespace, **kwargs):
+    def __init__(self, experiment_name:str, save_folder:str, project:str, 
+                entity:str, args:argparse.Namespace, **kwargs):
         """
             Wandb Logger Wrapper
             Parameters:
@@ -85,16 +86,6 @@ class WandbLogger:
         wandb.init(project=project, entity=entity, sync_tensorboard=True,\
                     config=vars(args), name=experiment_name,\
                     save_code=True, dir=wandb_save_dir, **kwargs)
-        
-        code = wandb.Artifact('project-source', type='code')
-        for path in glob.glob('*.py'):
-            print(path)
-            code.add_file(path)
-        
-        wandb.run.log_artifact(code)
-        print('_'*50)
-        print("Saved files used in this experiment")
-        print('_'*50)
 
         self.writer = SummaryWriter(f"{wandb.run.dir}/{experiment_name}")
         self.weight_save_path = os.path.join(wandb.run.dir, "model.ckpt")

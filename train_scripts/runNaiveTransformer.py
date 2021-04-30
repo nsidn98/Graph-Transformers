@@ -15,7 +15,7 @@ import sys
 # so the imports from different folders will work
 sys.path.append(os.path.abspath(os.getcwd()))
 
-from dataloaders.dataloaderBase import DataLoaderBase
+from dataloaders.snapDataloaders import DataLoaderSnap
 from models.naiveTransformer import naiveTransformerNet
 from utils.utils import print_args, print_box
 
@@ -34,20 +34,24 @@ class Trainer():
 
         ### dataloader ###
         # NOTE hardcoding HERE; make this compatible with Cora
+        print_box('Loading datasets')
         data_params = {'use_node_attr': args.use_node_attr, 'use_edge_attr': args.use_edge_attr}
-        self.dl = DataLoaderBase(dataset_name=args.dataset_name, 
+        self.dl = DataLoaderSnap(dataset_name=args.dataset_name, task=args.task,
                                 train_test_val_split=args.train_test_val_split, 
                                 batch_size=args.batch_size, shuffle=args.shuffle, 
                                 num_workers=args.num_workers, seed=args.seed, **data_params)
         self.trainLoader = self.dl.trainLoader
         self.valLoader   = self.dl.valLoader
         node_dim, edge_dim = self.dl.get_feat_dims()    # get node and edge feat dims
+        output_dim = self.dl.output_dim     # get the output dimension depending on the task
         ####################
 
         ### network init ###
-        self.network = naiveTransformerNet(in_channel=node_dim, heads=args.heads, 
-                                            concat=args.concat_heads, beta=args.beta_heads, 
-                                            dropout=args.dropout, edge_dim=edge_dim).to(self.device)
+        self.network = naiveTransformerNet(in_channels=node_dim, hidden_dim=args.hidden_dim, 
+                                        num_layers=args.num_layers, output_dim=output_dim,
+                                        heads=args.heads, concat=args.concat_heads, 
+                                        global_aggr=args.global_aggr, beta=args.beta_heads, 
+                                        dropout=args.dropout, edge_dim=edge_dim).to(self.device)
         print_box(self.network, num_dash=80)
         print_box(f'Is the Network on CUDA?: {next(self.network.parameters()).is_cuda}')
         ####################
@@ -55,7 +59,14 @@ class Trainer():
         self.optimizer = getattr(torch.optim, self.args.opt)(self.network.parameters(), 
                                                             lr=self.args.lr, 
                                                             weight_decay=self.args.weight_decay)
-        self.loss_function = nn.CrossEntropyLoss()
+
+        if args.classification_task:
+            self.loss_function = nn.CrossEntropyLoss()
+            print_box('Using Cross Entropy Loss')
+        else:
+            self.loss_function = nn.SmoothL1Loss()
+            print_box('Using Smooth L1 Loss')
+
 
     def train_epoch(self, train_step:int):
         # train one epoch 
@@ -66,7 +77,7 @@ class Trainer():
                 break
             ############
             data = data.to(self.device)
-            target = data.y
+            target = data.graph_label   # TODO make this more general
 
             # forward pass
             output = self.network(data)
@@ -104,7 +115,7 @@ class Trainer():
             if self.args.dryrun and j == 100:
                 break
             val_data = val_data.to(self.device)
-            val_target = val_data.y
+            val_target = val_data.graph_label   # TODO make this more general
 
             val_output = self.network(val_data)
             loss = self.loss_function(val_output, val_target)
@@ -129,8 +140,8 @@ class Trainer():
             # validation
             val_correct, val_total, val_epoch_loss = self.val_epoch()
             
-            self.print_metrics(epoch, epoch_loss, val_epoch_loss, correct, val_correct, total, val_total)
-            # print_box(f'Epoch: {epoch}, Epoch Loss:{epoch_loss/len(self.trainLoader):.3f}, Train Accuracy:{correct/total:.3f} Val Accuracy:{val_correct/val_total:.3f}')
+            if epoch % 10:
+                self.print_metrics(epoch, epoch_loss, val_epoch_loss, correct, val_correct, total, val_total)
             if self.logger:
                 self.logger.writer.add_scalar('Epoch loss', epoch_loss/len(self.trainLoader), epoch)
                 if self.args.classification_task:
@@ -197,8 +208,9 @@ if __name__ == "__main__":
     if args.dryrun:
         logger = None
     else:
-        logger = WandbLogger(experiment_name='naiveTransformer', save_folder='NT', 
-                            project='Graph Transformer', entity='graph_transformers', args=args)
+        logger = WandbLogger(experiment_name=args.exp_name, save_folder='NT', 
+                            project='Graph Transformer', entity='graph_transformers', 
+                            args=args)
 
     trainer = Trainer(args, device, logger)
     trainer.train()
