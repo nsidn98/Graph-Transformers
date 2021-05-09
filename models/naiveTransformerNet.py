@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.nn import Sequential, ReLU, Linear
 import torch.nn.functional as F
 from torch_geometric.nn import TransformerConv
+# from layers.transformerConv import TransformerConv
 from torch_geometric.nn import global_mean_pool, global_add_pool
 
 import os
@@ -14,11 +15,12 @@ import sys
 sys.path.append(os.path.abspath(os.getcwd()))
 from utils.utils import store_args
 
-class naiveTransformerNet(torch.nn.Module):
+class NaiveTransformerNet(torch.nn.Module):
     @store_args    
     def __init__(self, in_channels:int, hidden_dim:int, num_layers:int, 
                 output_dim:int, heads:int=1, concat:bool=True, global_aggr:str='add',
-                beta:bool=False, dropout:float=0.0, edge_dim:Optional[int]=None):
+                beta:bool=False, dropout:float=0.0, root_weight:bool=False,
+                edge_dim:Optional[int]=None):
         """
             A transformer graph convolutional neural network
             Aggregates only with attention weights evaluated on 
@@ -45,12 +47,14 @@ class naiveTransformerNet(torch.nn.Module):
                 Whether to add skip connections in the transformer layers; Default = False
             dropout: float
                 Dropout probability for transformer and linear layers; Default = True
+            root_weight: bool
+                If set to False, the layer will not add the transformed root node 
+                features to the output and the option self.beta False. Default = False
             edge_dim: int (Optional)
                 Edge dimension
                 Having this will include edge features in the attention evaluation
         """
-        super(naiveTransformerNet, self).__init__()
-        # TODO make for loop with nn.ModuleList()
+        super(NaiveTransformerNet, self).__init__()
         assert global_aggr in ['add', 'mean'], "Choose global aggr layer from 'mean' or 'add'"
         self.convs = nn.ModuleList()
         # add input layer
@@ -65,7 +69,10 @@ class naiveTransformerNet(torch.nn.Module):
                         nn.Linear(hidden_dim, output_dim))
 
     def forward(self, data):
-        x, edge_index, edge_attr, batch = data.node_feature, data.edge_index, data.edge_feature, data.batch
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        if self.edge_dim is None:
+            edge_attr = None
+        # x, edge_index, edge_attr, batch = data.node_feature, data.edge_index, data.edge_feature, data.batch
 
         # forward pass conv layers
         for i in range(self.num_layers):
@@ -84,7 +91,8 @@ class naiveTransformerNet(torch.nn.Module):
     def addTransformerConvLayer(self, in_channels:int, out_channels:int):
         return TransformerConv(in_channels=in_channels, out_channels=out_channels,
                                 heads=self.heads, concat=self.concat, beta=self.beta,
-                                dropout=self.dropout, edge_dim=self.edge_dim
+                                dropout=self.dropout, edge_dim=self.edge_dim, 
+                                root_weight=self.root_weight
                                 )
 
     def getInChannels(self, out_channels):
