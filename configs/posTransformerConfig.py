@@ -51,7 +51,9 @@ parser.add_argument('--root_wt', type=lambda x:bool(strtobool(x)), default=False
                     help='Whether to add root node feature to transformed node features\
 refer: https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/transformer_conv.html\
                         for more info')
-parser.add_argument('--dropout', type=float, default=0, help='To dropout in transformerConv')
+parser.add_argument('--dropout', type=float, default=0, help='To dropout in posTransformerConv')
+parser.add_argument('--num_pos_filters', type=int, default=10, 
+                    help='Number of positional encoding filters')
 ##################################################################
 
 ##################### optimizer #####################

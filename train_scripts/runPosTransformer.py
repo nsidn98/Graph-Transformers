@@ -1,6 +1,7 @@
 """
-    Script to train a Naive Graph Transformer model
-    This uses the transformerConv layers
+    Script to train a Positional Encoding 
+    Graph Transformer model
+    This uses the posTransformerConv layers
 """
 from tqdm import trange
 import argparse
@@ -18,7 +19,7 @@ sys.path.append(os.path.abspath(os.getcwd()))
 from torch_geometric.transforms import Compose
 from dataloaders.dataloaderMaster import DataLoaderMaster
 from dataloaders.transforms import AddRandomEdges, AddSelfLoop
-from models.naiveTransformerNet import NaiveTransformerNet
+from models.posTransformerNet import PosTransformerNet
 from utils.utils import print_args, print_box
 
 class Trainer():
@@ -53,11 +54,12 @@ class Trainer():
         ####################
 
         ### network init ###
-        self.network = NaiveTransformerNet(in_channels=node_dim, hidden_dim=args.hidden_dim, 
+        self.network = PosTransformerNet(in_channels=node_dim, hidden_dim=args.hidden_dim, 
                                         num_layers=args.num_layers, output_dim=output_dim,
                                         heads=args.heads, concat=args.concat_heads, 
                                         global_aggr=args.global_aggr, beta=args.beta_heads, 
                                         dropout=args.dropout, root_weight=args.root_wt,
+                                        num_pos_filters=args.num_pos_filters,
                                         edge_dim=edge_dim).to(self.device)
         print_box('\t\t Network Architecture', 60)
         print_box(self.network, num_dash=60)
@@ -221,7 +223,8 @@ class Trainer():
         self.network.load_state_dict(checkpoint_dict['state_dict']) 
 
 if __name__ == "__main__":
-    from configs.naiveTransformerConfig import args
+    from configs.posTransformerConfig import args
+    # from configs.naiveTransformerConfig import args
     from utils.logger import WandbLogger
 
     print_args(args)
