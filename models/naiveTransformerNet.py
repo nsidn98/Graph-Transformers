@@ -108,12 +108,13 @@ class NaiveTransformerNet(torch.nn.Module):
 
 if __name__ == "__main__":
     # NOTE run from the Graph-Transformers folder
-    from dataloaders.snapDataloaders import DataLoaderSnap
-    dl = DataLoaderSnap('ENZYMES', batch_size=2)
+    # test with sample data
+    from dataloaders.dataloaderMaster import DataLoaderMaster
+    dl = DataLoaderMaster('TU_MUTAG', batch_size=2, task='graph')
     trainLoader = dl.trainLoader
     data = next(iter(trainLoader))
     num_node_feats = data.num_node_features
-    net = naiveTransformerNet(in_channels=num_node_feats, hidden_dim=32, 
+    net = NaiveTransformerNet(in_channels=num_node_feats, hidden_dim=32, 
                                 num_layers=3, output_dim=2, heads=4)
     print(net)
     print(net(data).shape)

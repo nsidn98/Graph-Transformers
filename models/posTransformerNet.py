@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from torch.nn import Sequential, ReLU, Linear
 import torch.nn.functional as F
-from layers.posTransformerConv import PosTransformerConv
 from torch_geometric.nn import global_mean_pool, global_add_pool
 
 import os
@@ -13,6 +12,7 @@ import sys
 # so the imports from different folders will work
 sys.path.append(os.path.abspath(os.getcwd()))
 from utils.utils import store_args
+from layers.posTransformerConv import PosTransformerConv
 
 class PosTransformerNet(torch.nn.Module):
     @store_args    
@@ -109,12 +109,13 @@ class PosTransformerNet(torch.nn.Module):
 
 if __name__ == "__main__":
     # NOTE run from the Graph-Transformers folder
-    from dataloaders.snapDataloaders import DataLoaderSnap
-    dl = DataLoaderSnap('ENZYMES', batch_size=2)
+    # test with sample data
+    from dataloaders.dataloaderMaster import DataLoaderMaster
+    dl = DataLoaderMaster('TU_MUTAG', batch_size=5, task='graph')
     trainLoader = dl.trainLoader
     data = next(iter(trainLoader))
     num_node_feats = data.num_node_features
-    net = naiveTransformerNet(in_channels=num_node_feats, hidden_dim=32, 
+    net = PosTransformerNet(in_channels=num_node_feats, hidden_dim=32, 
                                 num_layers=3, output_dim=2, heads=4)
     print(net)
     print(net(data).shape)

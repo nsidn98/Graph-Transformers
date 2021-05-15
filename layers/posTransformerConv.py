@@ -80,6 +80,8 @@ class PosTransformerConv(MessagePassing):
             root_weight (bool, optional): If set to :obj:`False`, the layer will
                 not add the transformed root node features to the output and the
                 option  :attr:`beta` is set to :obj:`False`. (default: :obj:`True`)
+            num_pos_filters (int, optional): Number of filters for the positional 
+                encoding layer
             **kwargs (optional): Additional arguments of
                 :class:`torch_geometric.nn.conv.MessagePassing`.
     """
@@ -193,7 +195,8 @@ class PosTransformerConv(MessagePassing):
         # perform α_{u,v} = σ( ((W_u.x_u)^T . A_{u,v} . (W_v.x_v)) / sqrt(d))
         # https://pytorch.org/docs/stable/generated/torch.einsum.html
         # https://discuss.pytorch.org/t/how-to-implement-4d-tensor-multiplication/108476/5
-        AQ = torch.einsum('bhij, bhj -> bhi', A_ij, query) # NOTE @nsidn98, @octavian-ganea check if it is 'bhij, bhi -> bhj'
+        # NOTE @nsidn98, @octavian-ganea check if it is 'bhij, bhi -> bhj'
+        AQ = torch.einsum('bhij, bhj -> bhi', A_ij, query)
         # AQ is of shape [batch, heads, d]
         alpha = (key * AQ).sum(dim=-1) / math.sqrt(self.out_channels)   # shape [batch, heads]
         alpha = softmax(alpha, index, ptr, size_i)
