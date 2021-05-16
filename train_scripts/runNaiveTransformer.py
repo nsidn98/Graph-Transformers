@@ -37,15 +37,32 @@ class Trainer():
         ### dataloader ###
         # NOTE hardcoding data_params HERE; make this compatible with other datasets
         print_box('Loading datasets')
-        data_params = {'use_node_attr': args.use_node_attr, 'use_edge_attr': args.use_edge_attr}
+        # data_params = {'use_node_attr': args.use_node_attr, 'use_edge_attr': args.use_edge_attr}
+        data_params = {}
         transforms = self.composeTransforms()
         self.dl = DataLoaderMaster(dataset_name=args.dataset_name, 
-                                task=args.task, transform=transforms, 
-                                train_test_val_split=args.train_test_val_split, 
-                                batch_size=args.batch_size, shuffle=args.shuffle, 
-                                num_workers=args.num_workers, seed=args.seed, **data_params)
-        self.trainLoader = self.dl.trainLoader
-        self.valLoader   = self.dl.valLoader
+                                    task=args.task, transform=transforms, 
+                                    train_test_val_split=args.train_test_val_split, 
+                                    batch_size=args.batch_size, shuffle=args.shuffle, 
+                                    num_workers=args.num_workers, seed=args.seed, **data_params)
+        if args.task == 'graph':
+            self.trainLoader = self.dl.trainLoader
+            self.valLoader   = self.dl.valLoader
+            self.lenTrainData = len(self.trainLoader)
+            self.lenValData = len(self.valLoader)
+        elif args.task == 'node':
+            self.dataset = self.dl.dataset.to(self.device)
+            self.targets = self.dataset.y
+            self.train_mask = self.dataset.train_mask
+            self.test_mask = self.dataset.test_mask
+            self.val_mask = self.dataset.val_mask
+            self.lenTrainData = 1
+            self.lenValData = 1
+        else:
+            raise ValueError('Currently only supports node and graph tasks')
+        ####################
+
+        ### dimensions ###
         node_dim, edge_dim = self.dl.num_node_features, self.dl.num_edge_features
         if self.args.add_self_loops:
             edge_dim = None
@@ -68,6 +85,17 @@ class Trainer():
                                                             lr=self.args.lr, 
                                                             weight_decay=self.args.weight_decay)
 
+        # define function to train and validate
+        if args.task == 'graph':
+            self.train_epoch = self.train_epoch_graph
+            self.val_epoch = self.val_epoch_graph
+        elif args.task == 'node':
+            self.train_epoch = self.train_epoch_node
+            self.val_epoch = self.val_epoch_node
+        else:
+            raise ValueError('Task not supported')
+
+        # define loss functions depending on task
         if args.classification_task:
             self.loss_function = nn.CrossEntropyLoss()
             print_box('Using Cross Entropy Loss')
@@ -92,8 +120,8 @@ class Trainer():
         return transforms
 
 
-    def train_epoch(self, train_step:int):
-        # train one epoch 
+    def train_epoch_graph(self, train_step:int):
+        # train one epoch for graph tasks 
         correct = 0; total = 0; epoch_loss = 0
         for batch_idx, data in enumerate(self.trainLoader):
             # if dryrun then only run for 100 batches
@@ -104,7 +132,7 @@ class Trainer():
             target = data.y
 
             # forward pass
-            output = self.network(data)
+            output = self.network(data, self.args.task)
             loss = self.loss_function(output, target)
             epoch_loss += loss.item()
             ##############
@@ -129,9 +157,38 @@ class Trainer():
             # prog_bar.set_description(f'Epoch={epoch} Loss (loss={loss.item():.3f})')
         return epoch_loss, correct, total, train_step
 
+    def train_epoch_node(self, train_step:int):
+        # train one epoch for node tasks 
+        correct = 0; total = 0; epoch_loss = 0
+        # forward pass
+        output = self.network(self.dataset, self.args.task)
+        loss = self.loss_function(output[self.train_mask], self.targets[self.train_mask])
+        epoch_loss += loss.item()
+        ############
+
+        # accuracy prediction
+        if self.args.classification_task:
+            _, predicted = torch.max(output[self.train_mask].data, 1)
+            correct += (predicted == self.targets[self.train_mask]).sum().item()
+            total += predicted.shape[0]
+        ############
+
+        # backprop
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        ############
+        
+        if (train_step % self.args.save_freq) and self.logger:
+            self.save_checkpoint(self.logger.weight_save_path, train_step)
+        
+        train_step += 1
+
+        return epoch_loss, correct, total, train_step
+
     @torch.no_grad()
-    def val_epoch(self):
-        # perform one epoch of validation
+    def val_epoch_graph(self):
+        # perform one epoch of validation for graph tasks
         self.network.eval()
         val_correct = 0; val_total = 0; val_epoch_loss = 0
         for j, val_data in enumerate(self.valLoader):
@@ -141,13 +198,34 @@ class Trainer():
             val_data = val_data.to(self.device)
             val_target = val_data.y
 
-            val_output = self.network(val_data)
+            val_output = self.network(val_data, self.args.task)
             loss = self.loss_function(val_output, val_target)
             val_epoch_loss += loss.item()
             # accuracy prediction
             _, val_predicted = torch.max(val_output.data, 1)
             val_correct += (val_predicted == val_target).sum().item()
             val_total += val_predicted.shape[0]
+        # important to set network back to training mode
+        self.network.train()
+        return val_correct, val_total, val_epoch_loss
+    
+    @torch.no_grad()
+    def val_epoch_node(self):
+        # perform one epoch of validation for node tasks
+        self.network.eval()
+        val_correct = 0; val_total = 0; val_epoch_loss = 0
+        # forward pass
+        val_output = self.network(self.dataset, self.args.task)
+        loss = self.loss_function(val_output[self.val_mask], self.targets[self.val_mask])
+        val_epoch_loss += loss
+        ############
+
+        # accuracy prediction
+        if self.args.classification_task:
+            _, val_predicted = torch.max(val_output[self.val_mask].data, 1)
+            val_correct += (val_predicted == self.targets[self.val_mask]).sum().item()
+            val_total += val_predicted.shape[0]
+        ############
         # important to set network back to training mode
         self.network.train()
         return val_correct, val_total, val_epoch_loss
@@ -167,7 +245,7 @@ class Trainer():
             if epoch % 10:
                 self.print_metrics(epoch, epoch_loss, val_epoch_loss, correct, val_correct, total, val_total)
             if self.logger:
-                self.logger.writer.add_scalar('Epoch loss', epoch_loss/len(self.trainLoader), epoch)
+                self.logger.writer.add_scalar('Epoch loss', epoch_loss/self.lenTrainData, epoch)
                 if self.args.classification_task:
                     self.logger.writer.add_scalar('Train Accuracy', correct/total, epoch)
                     self.logger.writer.add_scalar('Val Accuracy', val_correct/val_total, epoch)
@@ -178,8 +256,8 @@ class Trainer():
         """
             Print the metrics in a pretty format
         """
-        train_loss = train_loss/len(self.trainLoader)
-        val_loss = val_loss/len(self.valLoader)
+        train_loss = train_loss/self.lenTrainData
+        val_loss = val_loss/self.lenValData
         val_acc = val_correct/val_total
         train_acc = train_correct/train_total
         print_str = f'Epoch: {epoch}, Train Loss: {train_loss:.3f}, Val Loss: {val_loss:.3f}'
@@ -232,7 +310,7 @@ if __name__ == "__main__":
     if args.dryrun:
         logger = None
     else:
-        logger = WandbLogger(experiment_name=args.exp_name, save_folder='NT', 
+        logger = WandbLogger(experiment_name=args.exp_name, save_folder='NGT', 
                             project='Graph Transformer', entity='graph_transformers', 
                             args=args)
 

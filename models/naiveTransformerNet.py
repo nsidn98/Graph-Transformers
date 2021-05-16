@@ -68,8 +68,18 @@ class NaiveTransformerNet(torch.nn.Module):
                         nn.Dropout(dropout), ReLU(),
                         nn.Linear(hidden_dim, output_dim))
 
-    def forward(self, data):
-        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+    def forward(self, data, task:str='graph'):
+        """
+            data: torch_geometric.data.data.Data
+            task: str
+                If task is 'graph' then 'data' has 'batch' attribute
+                else it doesn't have. And global aggregation of features 
+                will only be performed if task is 'graph'
+        """
+        if task == 'graph':
+            x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        elif task == 'node':
+            x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, None
         if self.edge_dim is None:
             edge_attr = None
         # x, edge_index, edge_attr, batch = data.node_feature, data.edge_index, data.edge_feature, data.batch
@@ -78,11 +88,12 @@ class NaiveTransformerNet(torch.nn.Module):
         for i in range(self.num_layers):
             x = F.relu(self.convs[i](x, edge_index, edge_attr))
         
-        # aggregate from all nodes
-        if self.global_aggr == 'add':
-            x = global_add_pool(x, batch)
-        elif self.global_aggr == 'mean':
-            x = global_mean_pool(x, batch)
+        if batch is not None:
+            # aggregate from all nodes
+            if self.global_aggr == 'add':
+                x = global_add_pool(x, batch)
+            elif self.global_aggr == 'mean':
+                x = global_mean_pool(x, batch)
         
         # forward pass linear layers
         x = self.linears(x)

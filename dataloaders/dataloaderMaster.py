@@ -1,12 +1,6 @@
 """
-    Dataloader as used in snap-stanford/deepsnap
-    Using this because their method seems to be a 
-    more standard way of loading graph datasets from
-    Pytorch Geometric
-    NOTE: Install deepsnap using `pip install deepsnap`
-    Reference:
-    • Deepsnap example for graph classification:
-    https://github.com/snap-stanford/deepsnap/blob/master/examples/graph_classification/graph_classification_TU.py
+    Dataloader for usage
+
     • TUDataset
     https://chrsmrrs.github.io/datasets/docs/datasets/
     ________________________________________________________________________________________________________
@@ -23,7 +17,6 @@
 from typing import List
 import torch
 
-# from torch.utils.data import DataLoader
 from torch_geometric.data import DataLoader
 from torch_geometric.datasets import Planetoid, TUDataset, KarateClub, Coauthor, \
                                     Amazon, MNISTSuperpixels, PPI, QM7b
@@ -70,7 +63,7 @@ class DataLoaderMaster():
                 Dataset name.
             task:  str
                 The task for which the dataset is used for
-                task = 'node or 'edge' or 'link_pred' or 'graph'.
+                task = 'node' or 'edge' or 'link_pred' or 'graph'.
             transform: 
                 'transform' to transform the graphs
             train_test_val_split: List
@@ -141,21 +134,21 @@ class DataLoaderMaster():
         else:
             raise ValueError(f'{dataset_name} dataset is not supported')
         
-        if 'TU' in dataset_name or dataset_name in multi_graph_datasets:
+        if ('TU' in dataset_name) or (dataset_name in multi_graph_datasets):
             # shuffle dataset
             len_dataset = len(dataset_raw)
             torch.manual_seed(seed)
             perm = torch.randperm(len_dataset)
             # using this instead of dataset.shuffle() because I do not 
             # know which seed has to be set for its reproducibility
-            self.dataset_raw = dataset_raw[perm]
+            self.dataset = dataset_raw[perm]
             ##################
             # split into train-test-val
             train_idx = int(len_dataset * train_test_val_split[0])
             test_idx  = train_idx + int(len_dataset * train_test_val_split[1])
-            train_dataset = self.dataset_raw[:train_idx]
-            test_dataset  = self.dataset_raw[train_idx: test_idx]
-            val_dataset   = self.dataset_raw[test_idx:]
+            train_dataset = self.dataset[:train_idx]
+            test_dataset  = self.dataset[train_idx: test_idx]
+            val_dataset   = self.dataset[test_idx:]
             ##################
             # convert to dataloaders
             self.trainLoader = DataLoader(train_dataset, batch_size=batch_size,
@@ -165,16 +158,20 @@ class DataLoaderMaster():
             self.valLoader = DataLoader(val_dataset, batch_size=batch_size,
                                         shuffle=shuffle, num_workers=num_workers)
             ##################
-            self.get_output_dim()    
+            self.get_output_dim()
             self.get_feat_dims()
+
         elif dataset_name in single_graph_datasets:
-            # TODO: add compatibility for single graph datasets
-            # TODO: add train_test_val split and dataloader
-            # use torch_geometric.transoforms.AddTrainValTestMask
-            pass
+            # single graph datasets need to be passed as a whole
+            # so have to use the train_mask, test_mask and val_mask
+            self.dataset = dataset_raw
+            self.get_output_dim()
+            self.get_feat_dims()
+            self.dataset = dataset_raw[0]
+
 
     def get_feat_dims(self):
-        data = self.dataset_raw[0]
+        data = self.dataset[0]
         self.num_node_features = data.num_node_features
         self.num_edge_features = data.num_edge_features if data.num_edge_features > 0 else None
 
@@ -188,7 +185,9 @@ class DataLoaderMaster():
             right now just supports graph classification
         """
         if self.task == 'graph':
-            self.output_dim = self.dataset_raw.num_classes
+            self.output_dim = self.dataset.num_classes
+        if self.task == 'node':
+            self.output_dim = self.dataset.num_classes
 
 if __name__ == "__main__":
     from torch_geometric.transforms import Compose, AddSelfLoops
