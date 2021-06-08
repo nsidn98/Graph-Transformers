@@ -16,8 +16,8 @@ mkdir -p out_files
 # Run the script
 node_attr=('True' 'True' 'False' 'False')
 node_feat=('True' 'False' 'True' 'False')
-python -m node_embedding.runNode2Vec\
---exp_name='proteins'\
+python -m node_embedding.runNode2Vec \
+--exp_name='proteins' \
 --use_node_attr=${node_attr[$SLURM_ARRAY_TASK_ID]} \
 --use_node_feat=${node_feat[$SLURM_ARRAY_TASK_ID]} \
 &> out_files/${node_attr[$SLURM_ARRAY_TASK_ID]}_${node_feat[$SLURM_ARRAY_TASK_ID]}
