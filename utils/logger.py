@@ -88,6 +88,7 @@ class WandbLogger:
                     save_code=True, dir=wandb_save_dir, **kwargs)
 
         self.writer = SummaryWriter(f"{wandb.run.dir}/{experiment_name}")
+        self.wandb_dir = wandb.run.dir
         self.weight_save_path = os.path.join(wandb.run.dir, "model.ckpt")
     
     def save_checkpoint(self, network, path:str=None, epoch:int=0):
