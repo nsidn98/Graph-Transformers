@@ -2,8 +2,8 @@
 
 # to run single experiment
 # Slurm sbatch options
-#SBATCH -a 0-4
-## SBATCH --gres=gpu:volta:1
+#SBATCH -a 0-3
+#SBATCH --gres=gpu:volta:1
 #SBATCH -n 10
 
 # Loading the required module
