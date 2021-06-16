@@ -168,7 +168,32 @@ class DataLoaderMaster():
             self.get_output_dim()
             self.get_feat_dims()
             self.dataset = dataset_raw[0]
-
+    
+    def get_planetoid_dataset(self, dataset_name:str, normalize_features:bool=True, 
+                            transform=None, split:str="public"):
+        """
+            Wrapper to load planetoid dataset
+            split: 'public', 'full', 'complete'
+            Taken from:
+            https://github.com/russellizadi/ssp/blob/c944bd719ddf19977301bb20d5cf7a8b9fe1944d/experiments/datasets.py
+        """
+        if split == 'complete':
+            dataset = Planetoid('data/', dataset_name)
+            dataset[0].train_mask.fill_(False)
+            dataset[0].train_mask[:dataset[0].num_nodes - 1000] = 1
+            dataset[0].val_mask.fill_(False)
+            dataset[0].val_mask[dataset[0].num_nodes - 1000:dataset[0].num_nodes - 500] = 1
+            dataset[0].test_mask.fill_(False)
+            dataset[0].test_mask[dataset[0].num_nodes - 500:] = 1
+        else:
+            dataset = Planetoid(path, dataset_name, split=split)
+        if transform is not None and normalize_features:
+            dataset.transform = T.Compose([T.NormalizeFeatures(), transform])
+        elif normalize_features:
+            dataset.transform = T.NormalizeFeatures()
+        elif transform is not None:
+            dataset.transform = transform
+        return dataset
 
     def get_feat_dims(self):
         data = self.dataset[0]
