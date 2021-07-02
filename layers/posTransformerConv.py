@@ -176,6 +176,7 @@ class PosTransformerConv(MessagePassing):
                 size_i: Optional[int]) -> Tensor:
         # distance between node embeddings
         # • d(u,v)  = || x_u - x_v ||
+        # TODO change this to node2vec(x_i)
         d_ij = torch.linalg.norm(x_i - x_j, dim=-1).unsqueeze(1)    # shape [batch, 1]
         # • P_{u,v} = [cos(a_i . d(u,v)); sin(a_i . d(u,v))] for i \in [1, ..., K]
         P_ij = self.posEnc(d_ij)    # shape [batch, 2K]
